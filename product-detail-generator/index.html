@@ -181,12 +181,14 @@
     background:#f2f0ff;
     color:var(--accent2);
   }
-  .gender-toggle{
+  .gender-toggle,
+  .foodtype-toggle{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:8px;
   }
-  .gender-toggle button{
+  .gender-toggle button,
+  .foodtype-toggle button{
     border:1.5px solid var(--border);
     background:#fafafa;
     border-radius:10px;
@@ -196,7 +198,8 @@
     color:var(--sub);
     font-weight:600;
   }
-  .gender-toggle button.active{
+  .gender-toggle button.active,
+  .foodtype-toggle button.active{
     border-color:var(--accent2);
     background:#f2f0ff;
     color:var(--accent2);
@@ -283,13 +286,13 @@
     </div>
 
     <div class="field">
-      <label>가격 (선택)</label>
+      <label>가격 (선택, 내부 메모용 — 상세페이지에는 표시되지 않습니다)</label>
       <input type="text" id="productPrice" placeholder="예: 29,900">
     </div>
 
     <div class="field">
-      <label>상품 한 줄 설명 (선택)</label>
-      <textarea id="productDesc" placeholder="예: 껍질까지 맛있는 완숙 한라봉"></textarea>
+      <label>상품 설명 메모 (선택)</label>
+      <textarea id="productDesc" placeholder="예: 껍질까지 맛있는 완숙 한라봉 (입력하지 않아도 AI가 상품명을 바탕으로 2~3줄 소개 문구를 자동으로 만들어줍니다)"></textarea>
     </div>
 
     <div class="field">
@@ -299,6 +302,15 @@
         <div class="cat-btn" data-cat="fashion"><span class="emoji">👕</span>의류</div>
         <div class="cat-btn" data-cat="goods"><span class="emoji">🛋️</span>일반상품</div>
       </div>
+    </div>
+
+    <div class="field" id="foodTypeField">
+      <label>음식 유형 (음식 전용)</label>
+      <div class="foodtype-toggle">
+        <button type="button" class="active" data-foodtype="cooked">조리식품</button>
+        <button type="button" data-foodtype="fresh">신선원물 (과일·야채·수산물 등)</button>
+      </div>
+      <p class="hint">신선원물을 선택하면 조리 이미지 대신 수확한 그대로의 신선한 원물 이미지로 생성됩니다.</p>
     </div>
 
     <div class="field" id="genderField">
@@ -346,6 +358,7 @@
 const state = {
   category: 'food',
   gender: 'female',
+  foodType: 'cooked', // 'cooked' | 'fresh'
   file: null, // {mimeType, data(base64 no prefix), dataUrl}
 };
 
@@ -364,6 +377,7 @@ const els = {
   loadingOverlay: document.getElementById('loadingOverlay'),
   loadingText: document.getElementById('loadingText'),
   genderField: document.getElementById('genderField'),
+  foodTypeField: document.getElementById('foodTypeField'),
 };
 
 // restore saved api key
@@ -378,15 +392,25 @@ document.querySelectorAll('.cat-btn').forEach(btn => {
     btn.classList.add('active');
     state.category = btn.dataset.cat;
     els.genderField.style.display = state.category === 'fashion' ? 'block' : 'none';
+    els.foodTypeField.style.display = state.category === 'food' ? 'block' : 'none';
   });
 });
 els.genderField.style.display = state.category === 'fashion' ? 'block' : 'none';
+els.foodTypeField.style.display = state.category === 'food' ? 'block' : 'none';
 
-document.querySelectorAll('.gender-toggle button').forEach(btn => {
+document.querySelectorAll('#genderField .gender-toggle button').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.gender-toggle button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#genderField .gender-toggle button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.gender = btn.dataset.gender;
+  });
+});
+
+document.querySelectorAll('#foodTypeField .foodtype-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#foodTypeField .foodtype-toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.foodType = btn.dataset.foodtype;
   });
 });
 
@@ -452,16 +476,61 @@ async function generateImageFromPrompt(apiKey, baseImage, prompt){
   return `data:${imgPart.inlineData.mimeType};base64,${imgPart.inlineData.data}`;
 }
 
+const TEXT_MODEL = 'gemini-2.5-flash';
+const CATEGORY_LABEL = { food: '음식', fashion: '의류', goods: '일반상품' };
+
+async function generateCopy(apiKey, { name, category, foodType, memo }){
+  const categoryLabel = category === 'food'
+    ? (foodType === 'fresh' ? '신선식품(원물)' : '조리식품')
+    : CATEGORY_LABEL[category];
+  const prompt = `당신은 이커머스 상세페이지 카피라이터입니다. 아래 상품 정보를 참고해서 상세페이지 상단에 들어갈 소개 문구를 자연스러운 한국어로 2~3줄로 작성해줘.
+과장 광고, 이모지, 따옴표 없이 담백하고 신뢰감 있게 작성하고, 각 줄은 줄바꿈으로만 구분해줘.
+상품명: ${name}
+카테고리: ${categoryLabel}
+참고 메모: ${memo || '없음'}`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    const msg = json && json.error && json.error.message ? json.error.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  const candidate = json.candidates && json.candidates[0];
+  const parts = candidate && candidate.content && candidate.content.parts || [];
+  const text = parts.map(p => p.text).filter(Boolean).join('').trim();
+  if (!text) throw new Error('소개 문구 생성 결과가 없습니다.');
+  return text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3);
+}
+
 const CATEGORY_CONFIG = {
   food: {
-    shots: [
-      { key: 'hero', label: '완성 플레이팅 컷', prompt:
-        '첨부된 음식/식재료 상품 이미지를 참고해서, 이 재료로 만든 완성 요리를 고급 레스토랑처럼 플레이팅한 실사 음식 사진을 생성해줘. 마켓컬리 상세페이지 스타일로 따뜻한 자연광, 얕은 심도(아웃포커스 배경), 45도 위에서 내려다보는 앵글, 김이 살짝 올라오는 먹음직스러운 느낌으로. 텍스트, 워터마크, 로고는 절대 넣지 마.' },
-      { key: 'table', label: '테이블 연출 컷', prompt:
-        '같은 음식을 식탁 위에 홈파티처럼 예쁘게 차려놓은 탑뷰(정수리 위 각도) 실사 사진을 생성해줘. 커트러리, 냅킨, 곁들임 반찬을 자연스럽게 배치. 텍스트나 워터마크 없이.' },
-      { key: 'closeup', label: '조리 디테일 클로즈업', prompt:
-        '같은 음식의 조리 디테일을 강조한 클로즈업 매크로 실사 사진을 생성해줘. 소스가 흐르거나 김이 올라오는 생생한 질감으로. 텍스트나 워터마크 없이.' },
-    ]
+    cooked: {
+      shots: [
+        { key: 'hero', label: '완성 플레이팅 컷', prompt:
+          '첨부된 음식/식재료 상품 이미지를 참고해서, 이 재료로 만든 완성 요리를 고급 레스토랑처럼 플레이팅한 실사 음식 사진을 생성해줘. 마켓컬리 상세페이지 스타일로 따뜻한 자연광, 얕은 심도(아웃포커스 배경), 45도 위에서 내려다보는 앵글, 김이 살짝 올라오는 먹음직스러운 느낌으로. 텍스트, 워터마크, 로고는 절대 넣지 마.' },
+        { key: 'table', label: '테이블 연출 컷', prompt:
+          '같은 음식을 식탁 위에 홈파티처럼 예쁘게 차려놓은 탑뷰(정수리 위 각도) 실사 사진을 생성해줘. 커트러리, 냅킨, 곁들임 반찬을 자연스럽게 배치. 텍스트나 워터마크 없이.' },
+        { key: 'closeup', label: '조리 디테일 클로즈업', prompt:
+          '같은 음식의 조리 디테일을 강조한 클로즈업 매크로 실사 사진을 생성해줘. 소스가 흐르거나 김이 올라오는 생생한 질감으로. 텍스트나 워터마크 없이.' },
+      ]
+    },
+    fresh: {
+      shots: [
+        { key: 'hero', label: '신선 원물 메인 컷', prompt:
+          '첨부된 상품 이미지를 참고해서, 조리하거나 가공하지 않은 수확 그대로의 신선한 원물을 자연광 아래에서 촬영한 실사 사진을 생성해줘. 네이버 쇼핑윈도 산지직송 상품처럼 소박한 나무 상자나 대바구니에 담긴 모습으로, 신선함과 생기가 느껴지도록. 텍스트, 워터마크, 로고는 절대 넣지 마.' },
+        { key: 'group', label: '수확물 진열 컷', prompt:
+          '같은 상품 여러 개를 수확 직후처럼 소복하게 쌓아놓거나 상자/바구니에 진열한 실사 사진을 생성해줘. 산지에서 갓 수확한 듯한 신선함을 강조. 텍스트나 워터마크 없이.' },
+        { key: 'scale', label: '크기 비교 컷', prompt:
+          '같은 상품을 사람 손으로 들고 있어 크기와 신선도를 가늠할 수 있는 실사 사진을 생성해줘. 자연광 아래 생생한 색감으로. 텍스트나 워터마크 없이.' },
+        { key: 'texture', label: '단면/질감 클로즈업', prompt:
+          '같은 상품의 표면 질감이나 자른 단면(과일·채소는 단면, 수산물·해산물은 속살)을 강조한 매크로 클로즈업 실사 사진을 생성해줘. 신선함이 느껴지는 촉촉하고 생기있는 질감으로. 텍스트나 워터마크 없이.' },
+      ]
+    }
   },
   fashion: {
     shots: [
@@ -498,7 +567,7 @@ els.generateBtn.addEventListener('click', async () => {
 
   localStorage.setItem('pdg_api_key', apiKey);
 
-  const config = CATEGORY_CONFIG[state.category];
+  const config = state.category === 'food' ? CATEGORY_CONFIG.food[state.foodType] : CATEGORY_CONFIG[state.category];
   els.generateBtn.disabled = true;
   els.loadingOverlay.classList.add('show');
   els.emptyState.style.display = 'none';
@@ -506,9 +575,28 @@ els.generateBtn.addEventListener('click', async () => {
   try {
     const images = {};
     let done = 0;
-    await Promise.all(config.shots.map(async (shot) => {
+    const totalTasks = config.shots.length + 1; // +1 for copy text generation
+
+    const copyTask = (async () => {
+      els.loadingText.textContent = `소개 문구 생성 중... (0/${totalTasks})`;
+      try {
+        const lines = await generateCopy(apiKey, {
+          name, category: state.category, foodType: state.foodType,
+          memo: els.productDesc.value.trim(),
+        });
+        done += 1;
+        return lines;
+      } catch (err) {
+        console.error('copy', err);
+        done += 1;
+        const memo = els.productDesc.value.trim();
+        return memo ? [memo] : [];
+      }
+    })();
+
+    const imageTasks = config.shots.map(async (shot) => {
       const prompt = typeof shot.prompt === 'function' ? shot.prompt(state.gender) : shot.prompt;
-      els.loadingText.textContent = `${shot.label} 생성 중... (${done}/${config.shots.length})`;
+      els.loadingText.textContent = `${shot.label} 생성 중... (${done}/${totalTasks})`;
       try {
         images[shot.key] = await generateImageFromPrompt(apiKey, state.file, prompt);
       } catch (err) {
@@ -517,14 +605,16 @@ els.generateBtn.addEventListener('click', async () => {
         setStatus(`일부 이미지 생성에 실패해 원본 이미지로 대체했습니다: ${err.message}`, 'error');
       }
       done += 1;
-      els.loadingText.textContent = `${shot.label} 완료 (${done}/${config.shots.length})`;
-    }));
+      els.loadingText.textContent = `${shot.label} 완료 (${done}/${totalTasks})`;
+    });
+
+    const [descLines] = await Promise.all([copyTask, ...imageTasks]);
 
     const html = buildDetailPageHtml({
       category: state.category,
+      foodType: state.foodType,
       name,
-      price: els.productPrice.value.trim(),
-      desc: els.productDesc.value.trim(),
+      descLines,
       images,
       gender: state.gender,
     });
@@ -563,10 +653,14 @@ function esc(str){
   return (str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function buildDetailPageHtml({ category, name, price, desc, images, gender }){
-  if (category === 'food') return buildFoodPage({ name, price, desc, images });
-  if (category === 'fashion') return buildFashionPage({ name, price, desc, images, gender });
-  return buildGoodsPage({ name, price, desc, images });
+function buildDetailPageHtml({ category, foodType, name, descLines, images, gender }){
+  if (category === 'food') return buildFoodPage({ name, descLines, images, foodType });
+  if (category === 'fashion') return buildFashionPage({ name, descLines, images, gender });
+  return buildGoodsPage({ name, descLines, images });
+}
+
+function descHtml(descLines){
+  return (descLines || []).map(l => `<p class="desc">${esc(l)}</p>`).join('');
 }
 
 function pageShell(bodyContent, extraStyle){
@@ -582,7 +676,7 @@ function pageShell(bodyContent, extraStyle){
 <body>${bodyContent}</body></html>`;
 }
 
-function buildFoodPage({ name, price, desc, images }){
+function buildFoodPage({ name, descLines, images, foodType }){
   const style = `
     .wrap{max-width:720px;margin:0 auto;}
     .hero{position:relative;}
@@ -590,9 +684,7 @@ function buildFoodPage({ name, price, desc, images }){
     .info{padding:24px 20px;border-bottom:8px solid #f4f4f5;}
     .badge{display:inline-block;background:#5f0080;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:4px;margin-bottom:10px;}
     h1{font-size:22px;font-weight:700;margin-bottom:8px;line-height:1.4;}
-    .desc{color:#52525b;font-size:14px;margin-bottom:14px;}
-    .price{font-size:26px;font-weight:800;}
-    .price small{font-size:14px;font-weight:500;color:#71717a;margin-left:6px;}
+    .desc{color:#52525b;font-size:14px;line-height:1.6;margin-bottom:4px;}
     .section-title{font-size:18px;font-weight:700;padding:28px 20px 16px;}
     .gallery{display:flex;flex-direction:column;gap:4px;}
     .gallery img{width:100%;}
@@ -601,14 +693,36 @@ function buildFoodPage({ name, price, desc, images }){
     .info-table .k{width:120px;padding:12px 8px;color:#71717a;background:#fafafa;flex-shrink:0;}
     .info-table .v{padding:12px 8px;flex:1;}
   `;
-  const body = `
+  const body = foodType === 'fresh'
+    ? `
+  <div class="wrap">
+    <div class="hero"><img src="${images.hero}" alt="${esc(name)}"></div>
+    <div class="info">
+      <span class="badge">산지직송</span>
+      <h1>${esc(name)}</h1>
+      ${descHtml(descLines)}
+    </div>
+    <div class="section-title">신선함 그대로</div>
+    <div class="gallery">
+      <img src="${images.group}" alt="수확물 진열">
+      <img src="${images.scale}" alt="크기 비교">
+      <img src="${images.texture}" alt="단면/질감">
+    </div>
+    <div class="section-title">상품 정보</div>
+    <div class="info-table">
+      <div><div class="k">상품명</div><div class="v">${esc(name)}</div></div>
+      <div><div class="k">보관방법</div><div class="v">냉장보관, 서늘하고 그늘진 곳 보관 권장</div></div>
+      <div><div class="k">입고방식</div><div class="v">산지 직송, 수확 후 신속 입고</div></div>
+      <div><div class="k">배송안내</div><div class="v">신선배송 (지역별 상이)</div></div>
+    </div>
+  </div>`
+    : `
   <div class="wrap">
     <div class="hero"><img src="${images.hero}" alt="${esc(name)}"></div>
     <div class="info">
       <span class="badge">신선배송</span>
       <h1>${esc(name)}</h1>
-      ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
-      ${price ? `<div class="price">${esc(price)}원 <small>1개 기준</small></div>` : ''}
+      ${descHtml(descLines)}
     </div>
     <div class="section-title">이렇게 즐겨보세요</div>
     <div class="gallery">
@@ -626,15 +740,14 @@ function buildFoodPage({ name, price, desc, images }){
   return pageShell(body, style);
 }
 
-function buildFashionPage({ name, price, desc, images, gender }){
+function buildFashionPage({ name, descLines, images, gender }){
   const style = `
     .wrap{max-width:720px;margin:0 auto;}
     .hero img{width:100%;height:900px;object-fit:cover;background:#f4f4f5;}
     .info{padding:24px 20px;}
     .brand{font-size:12px;color:#a1a1aa;letter-spacing:.05em;margin-bottom:6px;}
     h1{font-size:20px;font-weight:600;margin-bottom:10px;line-height:1.4;}
-    .desc{color:#52525b;font-size:14px;margin-bottom:14px;}
-    .price{font-size:24px;font-weight:800;}
+    .desc{color:#52525b;font-size:14px;line-height:1.6;margin-bottom:4px;}
     .cuts{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px 0;}
     .cuts img{width:100%;height:480px;object-fit:cover;}
     .full img{width:100%;height:640px;object-fit:cover;}
@@ -650,8 +763,7 @@ function buildFashionPage({ name, price, desc, images, gender }){
     <div class="info">
       <div class="brand">LOOKBOOK</div>
       <h1>${esc(name)}</h1>
-      ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
-      ${price ? `<div class="price">${esc(price)}원</div>` : ''}
+      ${descHtml(descLines)}
     </div>
     <div class="cuts">
       <img src="${images.front}" alt="정면 컷">
@@ -671,7 +783,7 @@ function buildFashionPage({ name, price, desc, images, gender }){
   return pageShell(body, style);
 }
 
-function buildGoodsPage({ name, price, desc, images }){
+function buildGoodsPage({ name, descLines, images }){
   const style = `
     .wrap{max-width:720px;margin:0 auto;}
     .main-view{background:#fff;padding:40px 20px;}
@@ -680,8 +792,7 @@ function buildGoodsPage({ name, price, desc, images }){
     .thumbs img{width:72px;height:72px;object-fit:contain;border:1px solid #eee;border-radius:8px;background:#fff;}
     .info{padding:8px 20px 24px;border-bottom:8px solid #f4f4f5;}
     h1{font-size:20px;font-weight:700;margin-bottom:10px;line-height:1.4;}
-    .desc{color:#52525b;font-size:14px;margin-bottom:14px;}
-    .price{font-size:24px;font-weight:800;}
+    .desc{color:#52525b;font-size:14px;line-height:1.6;margin-bottom:4px;}
     .section-title{font-size:16px;font-weight:700;padding:28px 20px 16px;}
     .angles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 20px 32px;}
     .angles figure{margin:0;text-align:center;}
@@ -700,8 +811,7 @@ function buildGoodsPage({ name, price, desc, images }){
     </div>
     <div class="info">
       <h1>${esc(name)}</h1>
-      ${desc ? `<p class="desc">${esc(desc)}</p>` : ''}
-      ${price ? `<div class="price">${esc(price)}원</div>` : ''}
+      ${descHtml(descLines)}
     </div>
     <div class="section-title">다양한 각도로 확인하세요</div>
     <div class="angles">
