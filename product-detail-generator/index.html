@@ -254,6 +254,24 @@
     border-color:#a1a1aa;
     color:var(--text);
   }
+  .suggest-btn{
+    width:100%;
+    padding:10px;
+    border:1.5px dashed var(--accent2);
+    border-radius:10px;
+    background:#f8f7ff;
+    color:var(--accent2);
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:10px;
+  }
+  .suggest-btn:disabled{
+    border-color:var(--border);
+    background:#fafafa;
+    color:var(--sub);
+    cursor:not-allowed;
+  }
   .toolbar-btn{
     border:1px solid var(--border);
     background:#fff;
@@ -372,6 +390,8 @@
         <div class="ph"><strong>+</strong>클릭하여 이미지 업로드</div>
       </div>
       <input type="file" id="fileInput" accept="image/*" style="display:none;">
+      <button type="button" class="suggest-btn" id="suggestNameBtn">🔍 이미지로 상품명 추천</button>
+      <p class="hint">업로드한 사진을 AI가 보고 상품명을 추천해 위 입력칸에 채워줍니다(수정 가능). Gemini API 키가 필요합니다 — 네이버쇼핑 실제 검색 결과가 아닌 AI 추정치입니다.</p>
     </div>
 
     <button class="generate-btn" id="generateBtn">상세페이지 생성하기</button>
@@ -418,6 +438,7 @@ const els = {
   fileInput: document.getElementById('fileInput'),
   generateBtn: document.getElementById('generateBtn'),
   resetBtn: document.getElementById('resetBtn'),
+  suggestNameBtn: document.getElementById('suggestNameBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   status: document.getElementById('status'),
   previewFrame: document.getElementById('previewFrame'),
@@ -572,6 +593,33 @@ async function generateCopy(apiKey, { name, category, foodType, memo }){
   return text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3);
 }
 
+async function suggestProductName(apiKey, image){
+  const prompt = '첨부된 이미지를 보고 이커머스 쇼핑몰에 어울리는 간결한 상품명을 한국어로 딱 1개만 제안해줘. 브랜드명은 추측하지 말고 상품의 종류·특징 중심으로 작성해. 설명이나 따옴표 없이 상품명 한 줄만 출력해줘.';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${TEXT_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: image.mimeType, data: image.data } }
+        ]
+      }]
+    })
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    const msg = json && json.error && json.error.message ? json.error.message : `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  const candidate = json.candidates && json.candidates[0];
+  const parts = candidate && candidate.content && candidate.content.parts || [];
+  const text = parts.map(p => p.text).filter(Boolean).join('').trim();
+  if (!text) throw new Error('상품명 추천 결과가 없습니다.');
+  return text.split('\n')[0].replace(/^["'“”]+|["'“”]+$/g, '').trim();
+}
+
 const CATEGORY_CONFIG = {
   food: {
     cooked: {
@@ -708,6 +756,31 @@ els.generateBtn.addEventListener('click', async () => {
   } finally {
     els.loadingOverlay.classList.remove('show');
     els.generateBtn.disabled = false;
+  }
+});
+
+els.suggestNameBtn.addEventListener('click', async () => {
+  clearStatus();
+  const apiKey = els.apiKey.value.trim();
+  if (!apiKey) {
+    document.querySelector('.api-key-details').open = true;
+    setStatus('상품명 추천에는 Gemini API 키가 필요합니다. 위에서 키를 입력해주세요.', 'error');
+    return;
+  }
+  if (!state.file) { setStatus('먼저 상품 이미지를 업로드해주세요.', 'error'); return; }
+
+  els.suggestNameBtn.disabled = true;
+  els.suggestNameBtn.textContent = '추천 중...';
+  try {
+    const name = await suggestProductName(apiKey, state.file);
+    els.productName.value = name;
+    setStatus(`AI 추천 상품명을 입력했습니다: "${name}" (필요하면 직접 수정하세요)`, 'info');
+  } catch (err) {
+    console.error('suggest name', err);
+    setStatus('상품명 추천에 실패했습니다: ' + err.message, 'error');
+  } finally {
+    els.suggestNameBtn.disabled = false;
+    els.suggestNameBtn.textContent = '🔍 이미지로 상품명 추천';
   }
 });
 
