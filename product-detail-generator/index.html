@@ -197,13 +197,15 @@
     color:var(--accent2);
   }
   .gender-toggle,
-  .foodtype-toggle{
+  .foodtype-toggle,
+  .mode-toggle{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:8px;
   }
   .gender-toggle button,
-  .foodtype-toggle button{
+  .foodtype-toggle button,
+  .mode-toggle button{
     border:1.5px solid var(--border);
     background:#fafafa;
     border-radius:10px;
@@ -214,7 +216,8 @@
     font-weight:600;
   }
   .gender-toggle button.active,
-  .foodtype-toggle button.active{
+  .foodtype-toggle button.active,
+  .mode-toggle button.active{
     border-color:var(--accent2);
     background:#f2f0ff;
     color:var(--accent2);
@@ -307,7 +310,7 @@
       <summary>Google Gemini API 키 설정</summary>
       <div style="margin-top:10px;">
         <input type="password" id="apiKey" placeholder="AIza... 로 시작하는 API 키" autocomplete="off">
-        <p class="hint"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 발급. 이 키는 이 브라우저에만 저장되며 이미지 생성 API 호출에 직접 사용됩니다(서버 경유 없음 = 네트워크 탭에 노출될 수 있으니 개인/테스트 용도로만 사용하세요).<br><strong>주의:</strong> 이미지 생성 모델(gemini-2.5-flash-image)은 무료 티어 할당량이 0이라 결제(billing)가 연결된 Google Cloud 프로젝트의 키가 필요합니다. 무료 키만 있다면 <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener">429 quota exceeded</a> 오류가 발생할 수 있습니다.</p>
+        <p class="hint">아래 "이미지 생성 방식"을 <strong>레이아웃만(무료)</strong>로 두면 API 키 없이도 사용할 수 있습니다. 키를 입력하면 소개 문구는 AI로 다듬어주고, <strong>AI 이미지 생성(유료)</strong> 모드에서는 이미지도 새로 생성합니다.<br><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 발급. 이 키는 이 브라우저에만 저장되며 API 호출에 직접 사용됩니다(서버 경유 없음 = 네트워크 탭에 노출될 수 있으니 개인/테스트 용도로만 사용하세요).<br><strong>주의:</strong> 이미지 생성 모델(gemini-2.5-flash-image)은 무료 티어 할당량이 0이라 결제(billing)가 연결된 Google Cloud 프로젝트의 키가 필요합니다. 무료 키만 있다면 <a href="https://ai.google.dev/gemini-api/docs/rate-limits" target="_blank" rel="noopener">429 quota exceeded</a> 오류가 발생할 수 있습니다.</p>
       </div>
     </details>
 
@@ -335,6 +338,15 @@
         <div class="cat-btn" data-cat="fashion"><span class="emoji">👕</span>의류</div>
         <div class="cat-btn" data-cat="goods"><span class="emoji">🛋️</span>일반상품</div>
       </div>
+    </div>
+
+    <div class="field" id="imageModeField">
+      <label>이미지 생성 방식</label>
+      <div class="mode-toggle">
+        <button type="button" class="active" data-mode="free">레이아웃만 (무료)</button>
+        <button type="button" data-mode="ai">AI 이미지 생성 (유료)</button>
+      </div>
+      <p class="hint" id="modeHint">업로드한 이미지를 그대로 재사용해 레이아웃만 구성합니다. 이미지 생성 API 비용이 들지 않습니다.</p>
     </div>
 
     <div class="field" id="foodTypeField">
@@ -393,6 +405,7 @@ const state = {
   category: 'food',
   gender: 'female',
   foodType: 'cooked', // 'cooked' | 'fresh'
+  imageMode: 'free', // 'free' (reuse uploaded image, no API cost) | 'ai' (Gemini image generation, paid)
   file: null, // {mimeType, data(base64 no prefix), dataUrl}
 };
 
@@ -413,6 +426,8 @@ const els = {
   loadingText: document.getElementById('loadingText'),
   genderField: document.getElementById('genderField'),
   foodTypeField: document.getElementById('foodTypeField'),
+  imageModeField: document.getElementById('imageModeField'),
+  modeHint: document.getElementById('modeHint'),
 };
 
 // restore saved api key
@@ -446,6 +461,21 @@ document.querySelectorAll('#foodTypeField .foodtype-toggle button').forEach(btn 
     document.querySelectorAll('#foodTypeField .foodtype-toggle button').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.foodType = btn.dataset.foodtype;
+  });
+});
+
+function updateModeHint(){
+  els.modeHint.textContent = state.imageMode === 'free'
+    ? '업로드한 이미지를 그대로 재사용해 레이아웃만 구성합니다. 이미지 생성 API 비용이 들지 않습니다.'
+    : 'Gemini 이미지 생성 API로 카테고리에 맞는 새 이미지를 생성합니다. 호출당 비용이 발생하니 필요할 때만 사용하세요.';
+}
+
+document.querySelectorAll('#imageModeField .mode-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#imageModeField .mode-toggle button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.imageMode = btn.dataset.mode;
+    updateModeHint();
   });
 });
 
@@ -595,12 +625,13 @@ els.generateBtn.addEventListener('click', async () => {
   clearStatus();
   const apiKey = els.apiKey.value.trim();
   const name = els.productName.value.trim();
+  const isFreeMode = state.imageMode === 'free';
 
-  if (!apiKey) { setStatus('Gemini API 키를 입력해주세요.', 'error'); return; }
+  if (!isFreeMode && !apiKey) { setStatus('AI 이미지 생성을 사용하려면 Gemini API 키를 입력해주세요. (레이아웃만 모드는 키 없이도 사용 가능)', 'error'); return; }
   if (!name) { setStatus('상품명을 입력해주세요.', 'error'); return; }
   if (!state.file) { setStatus('상품 이미지를 업로드해주세요.', 'error'); return; }
 
-  localStorage.setItem('pdg_api_key', apiKey);
+  if (apiKey) localStorage.setItem('pdg_api_key', apiKey);
 
   const config = state.category === 'food' ? CATEGORY_CONFIG.food[state.foodType] : CATEGORY_CONFIG[state.category];
   els.generateBtn.disabled = true;
@@ -610,26 +641,34 @@ els.generateBtn.addEventListener('click', async () => {
   try {
     const images = {};
     let done = 0;
-    const totalTasks = config.shots.length + 1; // +1 for copy text generation
+    const imageTaskCount = isFreeMode ? 0 : config.shots.length;
+    const copyTaskCount = apiKey ? 1 : 0;
+    const totalTasks = Math.max(1, imageTaskCount + copyTaskCount);
 
     const copyTask = (async () => {
-      els.loadingText.textContent = `소개 문구 생성 중... (0/${totalTasks})`;
+      const memo = els.productDesc.value.trim();
+      if (!apiKey) return memo ? [memo] : [];
+      els.loadingText.textContent = `소개 문구 생성 중... (${done}/${totalTasks})`;
       try {
         const lines = await generateCopy(apiKey, {
-          name, category: state.category, foodType: state.foodType,
-          memo: els.productDesc.value.trim(),
+          name, category: state.category, foodType: state.foodType, memo,
         });
         done += 1;
         return lines;
       } catch (err) {
         console.error('copy', err);
         done += 1;
-        const memo = els.productDesc.value.trim();
         return memo ? [memo] : [];
       }
     })();
 
     const imageTasks = config.shots.map(async (shot) => {
+      if (isFreeMode) {
+        images[shot.key] = state.file.dataUrl;
+        done += 1;
+        els.loadingText.textContent = `레이아웃 구성 중... (${done}/${totalTasks})`;
+        return;
+      }
       const prompt = typeof shot.prompt === 'function' ? shot.prompt(state.gender) : shot.prompt;
       els.loadingText.textContent = `${shot.label} 생성 중... (${done}/${totalTasks})`;
       try {
@@ -660,7 +699,7 @@ els.generateBtn.addEventListener('click', async () => {
     els.downloadBtn.onclick = () => downloadHtml(html, name);
 
     if (!els.status.classList.contains('error')) {
-      setStatus('상세페이지 생성이 완료되었습니다.', 'info');
+      setStatus(isFreeMode ? '레이아웃으로 상세페이지가 생성되었습니다. (이미지는 업로드 원본 재사용)' : '상세페이지 생성이 완료되었습니다.', 'info');
     }
   } catch (err) {
     console.error(err);
@@ -693,6 +732,10 @@ els.resetBtn.addEventListener('click', () => {
 
   state.gender = 'female';
   document.querySelectorAll('#genderField .gender-toggle button').forEach(b => b.classList.toggle('active', b.dataset.gender === 'female'));
+
+  state.imageMode = 'free';
+  document.querySelectorAll('#imageModeField .mode-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === 'free'));
+  updateModeHint();
 
   clearStatus();
 
