@@ -80,26 +80,28 @@ export default function ResumePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">이력서 업로드</h1>
+        <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 sm:text-xl">
+          이력서 업로드
+        </h1>
         <p className="mt-1 text-sm text-neutral-500">
           PDF / DOCX / TXT 파일을 올려주세요. 학사 정보는 실제 학교 시스템이 아니라 데모용 가상 학생
           10명 DB에서만 조회됩니다.
         </p>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="space-y-3 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 sm:p-5">
         <input
           type="file"
           accept=".pdf,.docx,.txt"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm"
+          className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-2 file:text-sm file:font-medium dark:file:bg-neutral-800"
         />
         <button
           onClick={handleUpload}
           disabled={!file || loading}
-          className="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+          className="w-full rounded-md bg-red-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40 sm:w-auto"
         >
           {loading ? "분석 중..." : "업로드 및 분석"}
         </button>
@@ -114,7 +116,7 @@ export default function ResumePage() {
               <select
                 value={manualStudentId}
                 onChange={(e) => handleManualSelect(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
+                className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2.5 text-base dark:border-neutral-700 dark:bg-neutral-900"
               >
                 <option value="">선택하세요</option>
                 {students.map((s) => (
@@ -127,9 +129,9 @@ export default function ResumePage() {
           )}
 
           {matchedStudent && (
-            <div className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+            <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 sm:p-5">
               <h2 className="mb-3 font-semibold">자동으로 채워진 학사 정보</h2>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm sm:grid-cols-3 sm:gap-x-4 sm:gap-y-2">
                 <Field label="이름" value={matchedStudent.name} />
                 <Field label="학번" value={matchedStudent.studentId} />
                 <Field label="단과대학" value={matchedStudent.college} />
@@ -148,7 +150,7 @@ export default function ResumePage() {
             </div>
           )}
 
-          <div className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 sm:p-5">
             <h2 className="mb-2 font-semibold">이력서 원문 (자유 기술 내용)</h2>
             <p className="mb-2 text-xs text-neutral-500">
               학사 정보 외 경력/프로젝트 등은 이 원문을 그대로 자소서 생성 단계에서 참고합니다.
@@ -157,14 +159,14 @@ export default function ResumePage() {
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
               rows={8}
-              className="w-full rounded-md border border-neutral-300 bg-neutral-50 p-2 text-xs dark:border-neutral-700 dark:bg-neutral-950"
+              className="w-full rounded-md border border-neutral-300 bg-neutral-50 p-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
             />
           </div>
 
           <button
             onClick={handleContinue}
             disabled={!matchedStudent}
-            className="rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
+            className="w-full rounded-md bg-red-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40 sm:w-auto"
           >
             다음 단계: 공고 분석 →
           </button>

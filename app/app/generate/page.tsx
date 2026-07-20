@@ -109,19 +109,21 @@ export default function GeneratePage() {
   if (!ready) return null;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">자소서 생성</h1>
+          <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 sm:text-xl">
+            자소서 생성
+          </h1>
           <p className="mt-1 text-sm text-neutral-500">
-            항목별 초안과 오른쪽 코멘트(작성 근거)를 확인하고, 마음에 들지 않으면 항목별로 다시 생성하세요.
+            항목별 초안과 코멘트(작성 근거)를 확인하고, 마음에 들지 않으면 항목별로 다시 생성하세요.
           </p>
         </div>
         {resumeProfile && jobAnalysis && (
           <button
             onClick={() => generateAll(resumeProfile, jobAnalysis)}
             disabled={loading}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-40 dark:border-neutral-700"
+            className="w-full shrink-0 rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:opacity-40 dark:border-neutral-700 sm:w-auto sm:py-1.5"
           >
             {loading ? "생성 중..." : "전체 다시 생성"}
           </button>
@@ -134,13 +136,13 @@ export default function GeneratePage() {
         <p className="text-sm text-neutral-500">초안을 생성하고 있습니다...</p>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         {sections.map((section) => (
           <div
             key={section.section}
-            className="grid gap-4 rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-3"
+            className="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 sm:p-5 md:grid-cols-3 md:gap-4"
           >
-            <div className="md:col-span-2 space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold">{section.section}</h2>
                 <span className="text-xs text-neutral-400">
@@ -151,28 +153,28 @@ export default function GeneratePage() {
                 value={section.content}
                 onChange={(e) => handleContentEdit(section.section, e.target.value)}
                 rows={8}
-                className="w-full rounded-md border border-neutral-300 p-3 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+                className="w-full rounded-md border border-neutral-300 p-3 text-base dark:border-neutral-700 dark:bg-neutral-950 sm:text-sm"
               />
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="재생성 시 반영할 지시사항 (예: 더 구체적인 사례로, 200자 줄여서 등)"
-                  value={instructions[section.section] ?? ""}
-                  onChange={(e) =>
-                    setInstructions((prev) => ({ ...prev, [section.section]: e.target.value }))
-                  }
-                  className="min-w-[220px] flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-950"
-                />
+              <input
+                type="text"
+                placeholder="재생성 시 반영할 지시사항 (예: 더 구체적인 사례로, 200자 줄여서 등)"
+                value={instructions[section.section] ?? ""}
+                onChange={(e) =>
+                  setInstructions((prev) => ({ ...prev, [section.section]: e.target.value }))
+                }
+                className="w-full rounded-md border border-neutral-300 px-2.5 py-2 text-base dark:border-neutral-700 dark:bg-neutral-950 sm:text-xs"
+              />
+              <div className="flex gap-2">
                 <button
                   onClick={() => handleRegenerate(section)}
                   disabled={regeneratingSection === section.section}
-                  className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-40"
+                  className="flex-1 rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-40 sm:flex-none sm:py-1.5 sm:text-xs"
                 >
                   {regeneratingSection === section.section ? "재생성 중..." : "이 항목 재생성"}
                 </button>
                 <button
                   onClick={() => copyToClipboard(section.content)}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs dark:border-neutral-700"
+                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 sm:py-1.5 sm:text-xs"
                 >
                   복사
                 </button>

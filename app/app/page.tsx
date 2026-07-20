@@ -20,12 +20,12 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <div className="space-y-10">
+    <div className="space-y-8 sm:space-y-10">
       <section className="space-y-3">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+        <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 sm:text-2xl">
           서강 자소서 도우미
         </h1>
-        <p className="max-w-2xl text-neutral-600 dark:text-neutral-400">
+        <p className="max-w-2xl text-sm text-neutral-600 dark:text-neutral-400 sm:text-base">
           서강대생을 타깃으로 한 자기소개서 작성 도우미 데모입니다. 이력서를 업로드하고, 지원할 공고를
           등록하면 공고에 맞춘 자소서 초안과 그 근거를 함께 보여드립니다.
         </p>
@@ -34,12 +34,12 @@ export default function Home() {
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         {STEPS.map((step) => (
           <Link
             key={step.href}
             href={step.href}
-            className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5 transition-shadow hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900"
+            className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-4 transition-shadow active:shadow-inner hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 sm:p-5"
           >
             <h2 className="font-semibold text-neutral-900 dark:text-neutral-100">{step.title}</h2>
             <p className="text-sm text-neutral-500">{step.desc}</p>
