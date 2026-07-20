@@ -118,8 +118,8 @@ export default function JobPage() {
             </div>
             {analysis.analyzedBy === "heuristic" && (
               <p className="mb-3 text-xs text-amber-600">
-                ⚠️ ANTHROPIC_API_KEY가 설정되지 않아 키워드 기반 간이 분석 결과입니다. 정확도가 낮을 수
-                있으니 필요하면 항목을 직접 수정하세요.
+                ⚠️ GEMINI_API_KEY / ANTHROPIC_API_KEY가 설정되지 않아 키워드 기반 간이 분석 결과입니다.
+                정확도가 낮을 수 있으니 필요하면 항목을 직접 수정하세요.
               </p>
             )}
             <dl className="space-y-3 text-sm">

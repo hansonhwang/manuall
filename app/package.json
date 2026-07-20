@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",
+    "@google/genai": "^2.12.0",
     "cheerio": "^1.2.0",
     "mammoth": "^1.12.0",
     "next": "16.2.10",

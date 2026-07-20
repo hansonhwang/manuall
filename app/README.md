@@ -13,11 +13,13 @@ npm run dev
 
 ## LLM 연동 (선택)
 
-`ANTHROPIC_API_KEY`를 설정하면 Claude API로 공고 분석 및 자소서 생성 품질이 크게 올라갑니다. 키가 없으면 모든 기능이 **키워드/템플릿 기반 간이 로직으로 자동 폴백**되어 동작합니다(정확도는 낮지만 전체 플로우는 그대로 테스트 가능).
+`GEMINI_API_KEY` 또는 `ANTHROPIC_API_KEY` 중 하나를 설정하면 실제 AI로 공고 분석 및 자소서 생성 품질이 크게 올라갑니다. 둘 다 없으면 모든 기능이 **키워드/템플릿 기반 간이 로직으로 자동 폴백**되어 동작합니다(정확도는 낮지만 전체 플로우는 그대로 테스트 가능).
+
+`GEMINI_API_KEY`가 있으면 Gemini를, 없고 `ANTHROPIC_API_KEY`만 있으면 Claude를 사용합니다. Gemini는 [Google AI Studio](https://aistudio.google.com/apikey)에서 무료로 키를 발급받을 수 있어 결제 없이 바로 테스트하기 좋습니다.
 
 ```bash
 cp .env.example .env.local
-# .env.local 안에 ANTHROPIC_API_KEY 입력
+# .env.local 안에 GEMINI_API_KEY 또는 ANTHROPIC_API_KEY 입력
 ```
 
 ## 핵심 설계 결정 (요청사항 반영)
@@ -45,4 +47,4 @@ docs/PRD.md        기획 문서
 
 - 사람인/잡코리아 페이지의 실제 HTML 구조는 자주 바뀌므로 `lib/jobSource.ts`의 CSS 셀렉터가 맞지 않을 수 있습니다. 이 경우 자동으로 "본문 텍스트 직접 붙여넣기"를 안내합니다.
 - 상태는 서버 DB가 아닌 브라우저 `localStorage`에 저장됩니다(로그인/여러 기기 동기화 없음).
-- `ANTHROPIC_API_KEY` 없이 실행하면 공고 분석/자소서 생성 품질이 낮은 간이 로직으로 동작합니다.
+- `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` 없이 실행하면 공고 분석/자소서 생성 품질이 낮은 간이 로직으로 동작합니다.
